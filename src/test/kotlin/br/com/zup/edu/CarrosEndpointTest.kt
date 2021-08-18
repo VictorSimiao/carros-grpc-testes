@@ -9,6 +9,7 @@ import io.micronaut.grpc.annotation.GrpcChannel
 import io.micronaut.grpc.server.GrpcServerChannel
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import javax.inject.Singleton
@@ -19,10 +20,14 @@ internal class CarrosEndpointTest(
     val grpcClient: CarrosGrpcServiceGrpc.CarrosGrpcServiceBlockingStub
 ) {
 
+    @BeforeEach
+    fun setup(){
+        repository.deleteAll()
+    }
+
     @Test
     fun `deve cadastrar um novo carro`() {
-        repository.deleteAll()
-        //ação
+
         val response = grpcClient.adicionar(
             CarroRequest.newBuilder()
                 .setModelo("Gol")
@@ -39,8 +44,6 @@ internal class CarrosEndpointTest(
     @Test
     fun `nao deve cadastrar um novo carro com placa já existente`() {
 
-        //cenário
-        repository.deleteAll()
         val carroExistente = repository.save(Carro(modelo = "Palio", placa = "MJK-8989"))
 
         //ação
@@ -57,6 +60,26 @@ internal class CarrosEndpointTest(
         assertEquals(Status.ALREADY_EXISTS.code, erro.status.code )
         assertEquals("Carro com placa existente", erro.status.description)
     }
+
+    @Test
+    fun `nao deve cadastrar novo carro quando dados de entrada forem invalidos`(){
+        val carroExistente = repository.save(Carro(modelo = "Palio", placa = "MJK-8989"))
+
+        //ação
+
+        val erro = assertThrows<StatusRuntimeException> {
+            grpcClient.adicionar(
+                CarroRequest.newBuilder()
+                    .setModelo("")
+                    .setPlaca("")
+                    .build()
+            )
+        }
+        //Validação
+        assertEquals(Status.INVALID_ARGUMENT.code, erro.status.code )
+        assertEquals("dados de entrada inválidos", erro.status.description)
+    }
+
 
     @Factory
     class Clients {
